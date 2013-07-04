@@ -3,6 +3,7 @@ import ConfigParser
 
 import socket
 import sys
+import traceback
 
 binpath=os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, binpath + '/../lib')
@@ -96,8 +97,7 @@ class GPIODaemon(Daemon.Daemon):
                                 self.persistence=False
                                 clientsocket.send('0')
                                 continue
-			#try:
-			if True:
+			try:
 				m = re.search('^GPIO\.([a-zA-Z]+)\(([^\)]+)\)$', input)
 				if m is not None:
 					params=m.group(2).split(',')
@@ -154,12 +154,25 @@ class GPIODaemon(Daemon.Daemon):
 							# not forked blink, main process listen STOPS until it ends
 							clientsocket.send('1')
 							self.blink(params)
+					elif m.group(1) == 'batch':
+						for p in params:
+							c=re.search('([s\-\+]?)([0-9\.]+)', p)
+							if c.group(1) == 's':
+								time.sleep(float(c.group(2)))
+							else:
+								self.autoSetup(int(c.group(2)), GPIO.OUT)
+								if c.group(1) == '-':
+		                                                	GPIO.output(int(c.group(2)), 0)
+								else:
+									GPIO.output(int(c.group(2)), 1)
 					else:
 						clientsocket.send('-1')
 					continue
-			#except:
-			#	clientsocket.send('-2')
-			#	continue
+			except:
+				if self.config.get('common', 'debug'):
+					traceback.print_exc(file=sys.stdout)
+				clientsocket.send('-2')
+				continue
 			clientsocket.send('-1')
 
 	def blink(self, params):
