@@ -42,7 +42,7 @@ class TokensDaemon(Daemon.Daemon):
 				self.activeTokens[r] = time.time()
 				continue
 			elif query=='debug':
-				if config.get('server', 'debug') == '1'
+				if config.get('server', 'debug') == '1':
 					print "On stack: %d" % len(self.activeTokens)
 				continue
 			(cmd, arg) = query.split(':', 2)

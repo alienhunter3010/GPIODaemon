@@ -26,6 +26,8 @@ class Daemon:
                         	d.stop()
 	                elif 'restart' == sys.argv[1]:
         	                d.restart()
+			elif 'reload' == sys.argv[1]:
+				d.reload()
                 	else:   
                         	print "Unknown command"
 	                        sys.exit(2)
@@ -86,7 +88,11 @@ class Daemon:
         def delpid(self):
 		if self.enableAtExit:
 	                os.remove(self.pidfile)
- 
+
+ 	def init(self):
+		# Override me!
+		return
+
         def start(self):
                 """
                 Start the daemon
@@ -108,6 +114,10 @@ class Daemon:
                 self.daemonize()
                 self.run()
  
+	def reload(self):
+		# Override me
+		return
+
         def stop(self):
                 """
                 Stop the daemon

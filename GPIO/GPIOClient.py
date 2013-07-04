@@ -47,7 +47,7 @@ class GPIOClient():
 			a.update(t)
 			payload.append(t)
 		else:
-			a.update(pma)
+			a.update(self.pma)
 		a.update(command)
 		payload.insert(0, a.digest())
 		self.service.send('::'.join(payload))

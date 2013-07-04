@@ -8,7 +8,7 @@ import traceback
 binpath=os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, binpath + '/../lib')
 
-from myGPIO import mnemonic
+#from myGPIO import mnemonic
 import RPi.GPIO as GPIO
 import Daemon
 
@@ -23,10 +23,42 @@ class GPIODaemon(Daemon.Daemon):
 	setupMap = {}
 	eventsMap = {}
 	persistence=False
+	serversocket=False
 
-	def init(self):
+	def reload(self):
+		# Take it easy and send a client command to the running daemon
+		# (please remember that resident daemon and service request are two distinct processes!)
+		import GPIOClient
+		c = GPIOClient.GPIOClient()
+		c.sendCommand('system.reload')
+
+	def setup(self):
 		self.config = ConfigParser.ConfigParser()
                 self.config.read([binpath + '/../etc/GPIO.conf'])
+
+		self.tokenMode=not self.config.get('auth', 'token') in ('0', 'False')
+                if not self.tokenMode:
+                        # Poor Man Secret (copy it on your client script, too!)
+                        self.pma=self.config.get('auth', 'pma')
+                
+                if self.serversocket:
+                        self.serversocket.shutdown(socket.SHUT_RDWR)
+                        self.serversocket.close()
+		else: # First run
+			GPIO.setmode(GPIO.BOARD)
+	                GPIO.setwarnings(False)
+                #create an INET, STREAMing socket
+                self.serversocket = socket.socket(
+                    socket.AF_INET, socket.SOCK_STREAM)
+                #bind the socket to a public host,
+                # and the daemon port
+		self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.serversocket.bind(('', int(self.config.get('common', 'port')))) 
+                #become a server socket, GPIO is ONE, so we accept only 1 connection at a time!
+                self.serversocket.listen(1)
+
+		GPIO.setmode(GPIO.BOARD)
+		GPIO.setwarnings(False)
 
 	def checkToken(self, token):
 		#create an INET, STREAMing socket
@@ -53,35 +85,22 @@ class GPIODaemon(Daemon.Daemon):
 			print 'Error Triggering event, eventMap entry does not exists!?'
 
 	def run(self):
-		self.tokenMode=not self.config.get('auth', 'token') in ('0', 'False')
-		if not self.tokenMode:
-		        # Poor Man Secret (copy it on your client script, too!)
-		        self.pma=self.config.get('auth', 'pma')
-
-		o=mnemonic()
-
-		#create an INET, STREAMing socket
-		serversocket = socket.socket(
-		    socket.AF_INET, socket.SOCK_STREAM)
-		#bind the socket to a public host,
-		# and the daemon port
-		serversocket.bind(('', int(self.config.get('common', 'port'))))
-		#become a server socket, GPIO is ONE, so we accept only 1 connection at a time!
-		serversocket.listen(1)
+		self.setup()
 
 		while 1:
 			if not self.persistence:
 				#accept connections from outside
-				(clientsocket, address) = serversocket.accept()
+				(clientsocket, address) = self.serversocket.accept()
 			#now do something with the clientsocket
-			(auth, input, token) = clientsocket.recv(4096).split('::')
 			a = md5.new()
 			if self.tokenMode:
+				(auth, input, token) = clientsocket.recv(4096).split('::')
 				if self.checkToken(token) == False:
 					clientsocket.send('-4')
 					continue
 				a.update(token)
 			else:
+				(auth, input) = clientsocket.recv(4096).split('::')
 				a.update(self.pma)
 			a.update(input)
 			if (a.digest() != auth):
@@ -89,6 +108,9 @@ class GPIODaemon(Daemon.Daemon):
 				continue
 			if input=='system.quit':
 				exit()
+			elif input=='system.reload':
+				self.setup()
+				continue
 			elif input=='system.persistence.on':
 				self.persistence=True
 				clientsocket.send('0')
@@ -196,5 +218,4 @@ class GPIODaemon(Daemon.Daemon):
 
 if __name__ == "__main__":
 	daemon = GPIODaemon('/tmp/gpiod.pid')
-	daemon.init()
         Daemon.Daemon.manage(daemon)
