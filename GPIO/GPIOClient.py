@@ -51,6 +51,8 @@ class GPIOClient():
 		a.update(command)
 		payload.insert(0, a.digest())
 		self.service.send('::'.join(payload))
+		if self.config.get('common', 'debug'):
+			print self.service.recv(64)
 
 if __name__ == "__main__":
 	o = GPIOClient()

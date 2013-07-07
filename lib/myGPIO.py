@@ -40,6 +40,8 @@ class mnemonic():
 	FALLING=2
 	BOTH=3
 
+	invalidIO = (1, 2, 4, 6, 9, 14, 17, 20, 25)
+
 	def __init__(self):
 		if os.getuid() == 0:
 		        import RPi.GPIO as GPIO

@@ -8,7 +8,7 @@ import traceback
 binpath=os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, binpath + '/../lib')
 
-#from myGPIO import mnemonic
+from myGPIO import mnemonic
 import RPi.GPIO as GPIO
 import Daemon
 
@@ -22,8 +22,11 @@ class GPIODaemon(Daemon.Daemon):
 	pma=''
 	setupMap = {}
 	eventsMap = {}
+	pwmMap = {}
 	persistence=False
 	serversocket=False
+	mnemo=False
+	
 
 	def reload(self):
 		# Take it easy and send a client command to the running daemon
@@ -57,8 +60,7 @@ class GPIODaemon(Daemon.Daemon):
                 #become a server socket, GPIO is ONE, so we accept only 1 connection at a time!
                 self.serversocket.listen(1)
 
-		GPIO.setmode(GPIO.BOARD)
-		GPIO.setwarnings(False)
+		self.mnemo = mnemonic()
 
 	def checkToken(self, token):
 		#create an INET, STREAMing socket
@@ -84,6 +86,12 @@ class GPIODaemon(Daemon.Daemon):
 			#error
 			print 'Error Triggering event, eventMap entry does not exists!?'
 
+	def cleanup(self):
+		GPIO.cleanup()
+                self.setupMap = {}
+                self.eventsMap = {}
+                self.pwmMap = {}
+
 	def run(self):
 		self.setup()
 
@@ -107,6 +115,8 @@ class GPIODaemon(Daemon.Daemon):
 				clientsocket.send('-4')
 				continue
 			if input=='system.quit':
+				self.cleanup()
+				clientsocket.send('0')
 				exit()
 			elif input=='system.reload':
 				self.setup()
@@ -118,6 +128,10 @@ class GPIODaemon(Daemon.Daemon):
 			elif input=='system.persistence.off':
                                 self.persistence=False
                                 clientsocket.send('0')
+                                continue
+			elif input=='GPIO.cleanup':
+				self.cleanup()
+				clientsocket.send('0')
                                 continue
 			try:
 				m = re.search('^GPIO\.([a-zA-Z]+)\(([^\)]+)\)$', input)
@@ -138,11 +152,60 @@ class GPIODaemon(Daemon.Daemon):
 						self.autoSetup(int(params[0]), GPIO.IN)
 						clientsocket.send(str(GPIO.input(int(params[0]))))
 
+					# PWM
+					elif m.group(1) == 'addPWM':
+						if int(params[0]) in self.pwmMap:
+							if self.config.get('common', 'debug'):
+	                                                        for k in self.pwmMap.keys():
+        	                                                        print "%d : %s" % (k, self.pwmMap[k])
+                                                        # just existing event!
+                                                        clientsocket.send('-1')
+                                                        continue
+						# All PWM are output
+                                                self.autoSetup(int(params[0]), GPIO.OUT)
+						self.pwmMap[int(params[0])] = (address[0], GPIO.PWM(int(params[0]), float(params[1])))
+						if len(params) == 3:
+							self.pwmMap[int(params[0])][1].start(float(params[2]))
+						print "dc: %f; %f Hz owner: %s" % (float(params[1]), float(params[2]), address[0])
+						clientsocket.send('0')
+					elif m.group(1) == 'delPWM':
+                                                if int(params[0]) in self.pwmMap and self.pwmMap[int(params[0])][0] == address[0]:
+                                                        self.pwmMap[int(params[0])][1].stop()
+							del self.pwmMap[int(params[0])]
+                                                        clientsocket.send('0')
+                                                else:
+                                                        clientsocket.send('-1')
+					elif m.group(1) == 'startPWM':
+                                                if int(params[0]) in self.pwmMap and self.pwmMap[int(params[0])][0] == address[0]:
+                                                        self.pwmMap[int(params[0])][1].start(float(params[1]))
+                                                        clientsocket.send('0')
+                                                else:
+                                                        clientsocket.send('-1')
+					elif m.group(1) == 'stopPWM':
+                                                if int(params[0]) in self.pwmMap and self.pwmMap[int(params[0])][0] == address[0]:
+                                                        self.pwmMap[int(params[0])][1].stop()
+                                                        clientsocket.send('0')
+                                                else:
+                                                        clientsocket.send('-1')
+					elif m.group(1) == 'dutyCyclePWM':
+                                                if int(params[0]) in self.pwmMap and self.pwmMap[int(params[0])][0] == address[0]:
+                                                        self.pwmMap[int(params[0])][1].ChangeDutyCycle(float(params[1]))
+                                                        clientsocket.send('0')
+                                                else:
+                                                        clientsocket.send('-1')
+					elif m.group(1) == 'freqPWM':
+                                                if int(params[0]) in self.pwmMap and self.pwmMap[int(params[0])][0] == address[0]:
+                                                        self.pwmMap[int(params[0])][1].ChangeFrequency(float(params[1]))
+                                                        clientsocket.send('0')
+                                                else:   
+                                                        clientsocket.send('-1')
+
 					# Events
 					elif m.group(1) == 'addEvent':
 						if int(params[0]) in self.eventsMap:
-							for k in self.eventsMap.keys():
-								print "%d : %s" % (k, self.eventsMap[k])
+							if self.config.get('common', 'debug'):
+								for k in self.eventsMap.keys():
+									print "%d : %s" % (k, self.eventsMap[k])
 							# just existing event!
 							clientsocket.send('-1')
 							continue 
@@ -157,6 +220,7 @@ class GPIODaemon(Daemon.Daemon):
 					elif m.group(1) == 'delEvent':
 						if int(params[0]) in self.eventsMap and self.eventsMap[int(params[0])] == address[0]:
 							GPIO.remove_event_detect(int(params[0]))
+							del self.eventsMap[int(params[0])]
 							clientsocket.send('0')
 						else:
 							clientsocket.send('-1')
