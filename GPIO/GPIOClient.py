@@ -10,7 +10,7 @@ import md5
 class GPIOClient():
 	config=False
 	authMode=False
-	pma=False
+	secret=False
 	service=False
 
 	def __init__(self):
@@ -18,9 +18,7 @@ class GPIOClient():
 		self.config.read([os.path.dirname(os.path.abspath(__file__)) + '/../etc/GPIO.conf'])
 
 		self.authMode=not self.config.get('auth', 'token') in ('0', 'False')
-		if not self.authMode:
-			# Poor Man Authenticathion SECRET
-                        self.pma=self.config.get('auth', 'pma')
+                self.secret=self.config.get('auth', 'secret')
 
 		#create an INET, STREAMing socket
 		self.service = socket.socket(
@@ -46,8 +44,7 @@ class GPIOClient():
 			t = self.getToken()
 			a.update(t)
 			payload.append(t)
-		else:
-			a.update(self.pma)
+		a.update(self.secret)
 		a.update(command)
 		payload.insert(0, a.digest())
 		self.service.send('::'.join(payload))

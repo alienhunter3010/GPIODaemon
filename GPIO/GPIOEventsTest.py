@@ -45,18 +45,20 @@ if 2 in sys.argv:
 	debounce=sys.argv[2]
 cmd = 'GPIO.addEvent(' + sys.argv[1] + ',' + str(mnemonic.BOTH) + ',' + debounce + ')'
 a = md5.new()
+sendStr = [cmd]
 if authMode:
 	t = getToken()
 	a.update(t)
-	a.update(cmd)
-	s.send(a.digest() + '::' + cmd + '::' + t)
-else:
+	#a.update(cmd)
+	#s.send(a.digest() + '::' + cmd + '::' + t)
+	sendStr.append(t)
+#else:
 	# Poor Man Authenticathion SECRET
-        pma=config.get('auth', 'pma')
-
-	a.update(pma)
-	a.update(cmd)
-	s.send(a.digest() + '::' + cmd)
+secret=config.get('auth', 'secret')
+a.update(secret)
+a.update(cmd)
+sendStr.insert(0, a.digest())
+s.send('::'.join(sendStr))
 print s.recv(16);
 
 while (1):

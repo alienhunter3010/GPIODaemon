@@ -19,7 +19,7 @@ import time
 class GPIODaemon(Daemon.Daemon):
 	config=False
 	tokenMode=True
-	pma=''
+	secret=''
 	setupMap = {}
 	eventsMap = {}
 	pwmMap = {}
@@ -40,9 +40,7 @@ class GPIODaemon(Daemon.Daemon):
                 self.config.read([binpath + '/../etc/GPIO.conf'])
 
 		self.tokenMode=not self.config.get('auth', 'token') in ('0', 'False')
-                if not self.tokenMode:
-                        # Poor Man Secret (copy it on your client script, too!)
-                        self.pma=self.config.get('auth', 'pma')
+                self.secret=self.config.get('auth', 'secret')
                 
                 if self.serversocket:
                         self.serversocket.shutdown(socket.SHUT_RDWR)
@@ -109,7 +107,7 @@ class GPIODaemon(Daemon.Daemon):
 				a.update(token)
 			else:
 				(auth, input) = clientsocket.recv(4096).split('::')
-				a.update(self.pma)
+			a.update(self.secret)
 			a.update(input)
 			if (a.digest() != auth):
 				clientsocket.send('-4')
