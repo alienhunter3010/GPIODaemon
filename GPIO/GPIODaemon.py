@@ -249,6 +249,7 @@ class GPIODaemon(Daemon.Daemon):
 		                                                	GPIO.output(int(c.group(2)), 0)
 								else:
 									GPIO.output(int(c.group(2)), 1)
+						clientsocket.send('0')
 					else:
 						clientsocket.send('-1')
 					continue
