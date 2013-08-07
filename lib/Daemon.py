@@ -79,9 +79,13 @@ class Daemon:
                 os.dup2(so.fileno(), sys.stdout.fileno())
                 os.dup2(se.fileno(), sys.stderr.fileno())
 		"""
+
+		atexit.register(self.delpid)
+		self.savepid()
        
+	def savepid(self):
                 # write pidfile
-                atexit.register(self.delpid)
+                #atexit.register(self.delpid)
                 pid = str(os.getpid())
                 file(self.pidfile,'w+').write("%s\n" % pid)
        

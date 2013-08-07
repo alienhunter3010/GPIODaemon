@@ -118,6 +118,7 @@ class GPIODaemon(Daemon.Daemon):
 				exit()
 			elif input=='system.reload':
 				self.setup()
+				clientsocket.send('0')
 				continue
 			elif input=='system.persistence.on':
 				self.persistence=True
@@ -228,12 +229,18 @@ class GPIODaemon(Daemon.Daemon):
 						try:
 				                        pid = os.fork()
 				                        if pid > 0:
-								clientsocket.send('0')
-                                				# parent stuff finished, listen again
-				                                continue
-							self.enableAtExit=False
-							self.blink(params)
-							exit()
+								self.enableAtExit=False
+                                                        	self.blink(params)
+								# parent DIE here!
+                                                        	os._exit(0)
+							clientsocket.send('0')
+							# exchange pid (not so cute)
+							self.savepid()
+                                			# child stuff finished, listen again
+				                        continue
+							#self.enableAtExit=False
+							#self.blink(params)
+							#os._exit(0)
 				                except OSError, e:
 							# not forked blink, main process listen STOPS until it ends
 							clientsocket.send('1')

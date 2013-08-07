@@ -12,6 +12,7 @@ class GPIOClient():
 	authMode=False
 	secret=False
 	service=False
+	pushService=False
 
 	def __init__(self):
 		self.config = ConfigParser.ConfigParser()
@@ -50,6 +51,13 @@ class GPIOClient():
 		self.service.send('::'.join(payload))
 		if self.config.get('common', 'debug'):
 			print self.service.recv(64)
+
+	def createPushService(self):
+		self.pushService = socket.socket(
+		    socket.AF_INET, socket.SOCK_STREAM)
+		#now connect to listen on the event trigger port
+		self.pushService.bind((self.config.get('client', 'host'), int(self.config.get('common', 'pushEventPort'))))
+		self.pushService.listen(1)
 
 if __name__ == "__main__":
 	o = GPIOClient()

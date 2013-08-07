@@ -39,6 +39,8 @@ class mnemonic():
 	RISING=1
 	FALLING=2
 	BOTH=3
+	HIGH=1
+	LOW=0
 
 	invalidIO = (1, 2, 4, 6, 9, 14, 17, 20, 25)
 
